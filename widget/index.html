@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0"/>
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <title>首页</title>
+    <link rel="stylesheet" type="text/css" href="./css/aui.css"/>
+    <style>
+    	body{
+        	background: #7B68EE;
+        }
+        .logo{
+        	margin: 5rem auto 3rem auto;
+        }
+        .enter-input{
+    		width:70%;
+    		height:2.2rem;
+    		margin-left: 15%;
+    		background: #FFFFFF;
+    		border-radius:0.25rem; 
+    		padding:0 0.5rem;
+    		margin-bottom: 0.75rem;
+    	}
+    	input[type="text"],
+    	input[type="text"],
+    	input[type="number"]{
+    		font-size:0.7rem;
+    	}
+    	.solidBtn{	
+			margin-top:2rem;		
+		    text-align: center;
+		    background: #F2F2F2;
+		    color: #FCAEAE;
+		    font-size: 0.8rem;              
+		    height:2.2rem;
+		    line-height: 2.2rem;       
+		    border-radius: 0.25rem;        
+		    width:70%;
+        	margin-left:15%; 
+		}
+		.set{	
+			margin-top:1rem;
+		    text-align: right;
+		    color: #333333;
+		    font-size: 0.7rem;              
+		    height:2.2rem;
+		    line-height: 2.2rem;       
+		    border-radius: 0.25rem;        
+        	margin-right:15%; 
+		}
+    </style>
+</head>
+<body>
+	<div class="aui-content" id="content">
+		<div class="enter-input aui-border" style="margin-top: 2rem;">
+			<input type="number" id="roomId" placeholder="房间ID（数字）" value="123">
+		</div>
+	    <div class="enter-input aui-border">
+	    	<input type="text" id="account" placeholder="登录唯一账号" value="">
+	    </div>
+        <div class="enter-input aui-border">
+        	<input type="text" id="nickname" placeholder="昵称" value="">
+    	</div>
+    	<div class="solidBtn"  tapmode onClick="check();">登录</div>
+	</div>
+</body>
+</html>
+<script type="text/javascript" src="script/api.js"></script>
+<script type="text/javascript" src="script/jquery.min.js"></script>
+
+<script type="text/javascript">
+
+    apiready = function () {
+        $api.fixStatusBar( $api.dom('content') );
+        api.parseTapmode();
+        
+        //保持屏幕唤醒
+        api.setKeepScreenOn({
+		    keepOn: true
+		});		
+    }
+
+    function check(){
+		var roomId=$('#roomId').val();
+		var account=$('#account').val();
+		var nickname=$('#nickname').val();
+
+		if(roomId == '' || roomId.match(/^\s+$/g)){
+			api.alert({msg:"请输入房间ID"});
+    		return;
+		}else if(account == '' || account.match(/^\s+$/g)){
+			api.alert({msg:"请输入登录账号"});
+    		return;
+		}else if(nickname == '' || nickname.match(/^\s+$/g)){
+			api.alert({msg:"请输入昵称"});
+    		return;
+		}
+        
+        //初始化mapleIM
+		var chat = api.require('mapleIM');
+
+		//initialize
+		//chat.initialize({appId: "d1461517***f"});
+
+		chat.enableDebugLog({
+		    enabled: true
+		});
+        
+        var session = {
+            roomId: roomId,
+            account: account,
+            nickname: nickname
+        };
+        //登录聊天室
+		chat.loginChatRoom(session, function(ret, err){
+		    if(ret){
+		    	login(roomId,account,nickname);
+		    }else{
+		        api.alert({msg:err.description});
+		    }
+		});
+	}
+	
+	function login(roomId,account,nickname){
+		var frmName='chatview';
+		var frmUrl='html/chatview.html';
+
+		//以frame类型打开，并且传入roomId、account、nickname
+		api.openFrame({
+		    name: frmName,
+		    url: frmUrl,
+            pageParam: {
+		        roomId: roomId,
+		        account:account,
+		        nickname:nickname,
+		    },
+		    rect:{
+		        x: 0,
+                y: 0,
+                w: 'auto',
+                h: 'auto'
+		    },
+		    bounces: false,
+		    bgColor: 'rgba(0,0,255,0)',
+		    vScrollBarEnabled:false,
+		    hScrollBarEnabled:false
+		});	
+    }
+    
+</script>

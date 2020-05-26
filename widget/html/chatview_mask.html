@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0"/>
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <title>聊天页面</title>
+    <link rel="stylesheet" type="text/css" href="../css/aui.css"/>
+    <link rel="stylesheet" type="text/css" href="../css/chat.css"/>
+	<style>
+        body{
+        	background: #7B68EE;
+        }
+    </style>
+</head>
+<body>
+	<div class="mask" tapmode onclick="resetmask();"></div>
+	<div class="viewer-count"><img src="../image/viewer.png" /><font id="viewerCount"></font></div>
+	<div class="viewer-list-btn" id="viewerListBtn" tapmode onclick="showViewerList();event.cancelBubble=true;"><i class="aui-iconfont aui-icon-menu"></i></div>	
+	<div class="viewer-list" id="viewerList"></div>
+
+	<div class="chart-list" id="chartList"></div>
+	<div class="comment-btn" tapmode onclick="showChatInput();event.cancelBubble=true;"><img class="btn-img" src="../image/comment.png" /></div>
+	<div class="close-btn" tapmode onclick="closeAlert();event.cancelBubble=true;"><img class="btn-img" src="../image/close.png" /></div>
+	<div class="chart-input" id="chartInputBar"><input id="chartInput" type="text" autofocus="autofocus" placeholder="说点什么吧" onBlur="hideChatInput()"/></div>
+	<div class="chart-send-btn" id="sendBtn" tapmode onclick="sendChart();">发送</div>
+	
+</body>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript" src="../script/jquery.min.js"></script>
+
+<script type="text/javascript">
+	var session={};
+	var UIInputId;
+	var chat;
+	var screenOrientation='portrait_up';
+	var buttons;
+	var callback;
+
+
+	apiready = function(){
+		//设置屏幕为全屏
+		api.setFullScreen({
+		    fullScreen: true
+		});
+		
+		//监听网络情况
+		api.addEventListener({
+		    name:'offline'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络异常！');
+		});		
+		api.addEventListener({
+		    name:'online'
+		}, function(ret, err){        
+		    insertChartContent('sys','系统','网络恢复！');
+		});
+		
+		api.parseTapmode();
+		
+		//设置全局变量
+		session = {
+		    roomId: api.pageParam.roomId,
+		    account: api.pageParam.account,
+		    nickname: api.pageParam.nickname
+		};
+
+      	chat = api.require('mapleIM');
+
+		insertChartContent('sys','系统','加入房间成功...');
+        
+		initUserList();
+        //启动定时器来定时获取(10s)
+		setInterval("initUserList()",1000*10);
+		//监听收到的消息
+		chat.addEventListener({ name: 'receiveMsg' }, function(ret, err) {
+		    if(ret){
+                insertChartContent('user',ret.sendName,ret.text);
+                api.toast({msg: JSON.stringify(ret)});
+		    }
+		});
+
+		//监听账号被强行踢出
+		chat.addEventListener({ name: 'forceLogout' }, function(ret, err) {
+		    api.alert({
+		    	msg:'您的账号在另外的设备登录，当前设备需强制踢下线',
+		    	buttons:['知道了']
+            },function(ret,err){
+            	if(ret.buttonIndex=='1'){
+            		close();
+            	}
+            });
+		});
+        //监听断开连接
+		chat.addEventListener({ name: 'disconnected' }, function(ret) {
+		     api.toast({msg:"房间连接断开. "});
+		});
+        //监听重连
+		chat.addEventListener({ name: 'reconnecting' }, function(ret) {
+		     api.toast({msg:"房间正在尝试重新连接. "});
+		});
+        //监听账号重新登录成功
+		chat.addEventListener({ name: 'reloginSuccess' }, function(ret) {
+		     api.toast({msg:"房间重连成功. "});
+		});
+        //监听账号重新登录失败
+		chat.addEventListener({ name: 'reloginFailed' }, function(ret) {
+		     api.toast({msg:JSON.stringify(ret)});
+		});
+	};		
+	
+	//获取用户总数及用户列表信息
+	function initUserList(){
+         //获取用户总数
+		 chat.getRoomMemberCount(function(ret, err) {
+		    if (ret) {
+		        $('#viewerCount').text(ret.count);
+		    }
+		 });
+         //获取用户列表
+		 chat.getUserList({index:0,total:20},function(ret, err) {
+		    if( ret ){
+		         var ht_user='<div class="viewer-list-item aui-ellipsis-1 aui-padded-l-15"><img class="crown" src="../image/head.png" />用户列表</div>';
+		    	 for(var i=0;i<ret.entities.length;i++){
+		    	 	ht_user+=
+		    	 		'<div class="viewer-list-item aui-ellipsis-1" data-account="'+ret.entities[i].account+'" tapmode onclick="onUserClick(this);event.cancelBubble=true;">'+ret.entities[i].nickname+'</div>';
+		    	 }
+		    	 $('#viewerList').html(ht_user);
+		    }else{
+		         alert( JSON.stringify( err ) );
+		    }
+		});
+	}
+	
+	function insertChartContent(type,sender,content){
+		if(type=='sys')
+			$('#chartList').append('<div class="chart-item sys-text">'+content+'</div>');
+		else if(type=='syserro')
+			$('#chartList').append('<div class="chart-item sys-text-erro">'+content+'</div>');
+		else if(type=='user')
+			$('#chartList').append('<div class="chart-item"><font class="aui-text-success">'+sender+'：</font>'+content+'</div>');
+		else
+			$('#chartList').append('<div class="chart-item"><font class="aui-text-danger">'+sender+'：</font>'+content+'</div>');
+				
+		$('#chartList').animate({
+			scrollTop:$('#chartList').scrollTop()+50
+		}, 500);
+	}
+	
+	function closeAlert(){
+        close();
+        api.closeWin();
+	}
+
+	function close(){
+		api.setFullScreen({
+		    fullScreen: false
+		});
+        //登出聊天室
+		chat.logoutChatRoom();
+        
+		api.closeFrame({
+			name: 'chatview'
+        });
+        api.closeFrame({
+			name: 'chatview_mask'
+        });
+	}
+	
+	//显示聊天输入框
+	function showChatInput(){
+		var wInput=api.frameWidth-100;
+		$('#chartInputBar').show();
+		$('#sendBtn').show();
+		$('#chartInputBar').css('width',wInput+'px');
+		$('#chartInput').css('width',(wInput-20)+'px');
+	}
+	
+	//隐藏聊天输入框
+	function hideChatInput(){
+		$('#chartInputBar').hide();
+		$('#sendBtn').hide();
+	}
+	
+	function showViewerList(){
+		$('#viewerListBtn').hide();
+		setTimeout(function() {
+            $('#viewerList').show()
+        },
+        300)
+	}
+	
+	function hideViewerList(){
+		$('#viewerListBtn').show();
+		$('#viewerList').hide();
+	}
+
+	//设置横屏竖屏
+	function setScreen(){
+		if(screenOrientation=='portrait_up'){
+			screenOrientation='landscape_left';
+		}else{
+			screenOrientation='portrait_up';
+		}
+
+		api.setScreenOrientation({
+		    orientation: screenOrientation
+		});
+	}
+
+	
+	function resetmask(){
+		$('#chartInput').blur();
+		//聊天输入框
+		hideChatInput();
+		$('#qualityOption').hide();
+		//人数列表隐藏
+		hideViewerList();
+	}
+	
+	function sendChart(){
+		var content=$('#chartInput').val();
+		if(content == '' || content.match(/^\s+$/g)){
+			api.alert({
+				msg:'请输入聊天内容'
+            });
+            return;
+		}
+        //发送消息
+        chat.sendMessage({text: content, type:1}, function(ret, err) {
+		    if (err) {
+		    		api.toast({
+				    	msg: err.description,
+				    	duration: 2000,
+				    	location: 'bottom'
+					})
+		    }else{
+				insertChartContent('me',api.pageParam.nickname,content);
+				$('#chartInput').val('');
+		    }
+		});
+	}
+	
+	function onUserClick(tag){
+		api.prompt({
+               title: '用户操作: [输入"1"踢人], [输入"2"禁言], [输入"3"解除禁言], [输入"4"加入黑名单]',
+               buttons: ['确定', '取消']
+               },function( ret, err ){
+                   if (ret.buttonIndex != 1)
+                   		return;
+
+                   var account=$(tag).attr('data-account');
+                   switch(ret.text) {
+                      case "1":
+                    	{
+                            //踢人
+                    		chat.kickoutUser({account : account}, function(ret, err){
+                    		});
+                    	}
+                    	break;
+                      case "2":
+                    	{
+                            //禁言用户
+							chat.muteUser({muted : true, account : account}, function(ret, err){
+                    		});
+                    	}
+                    	break;
+                   	  case "3":
+                    	{
+                            //解禁用户说话
+							chat.muteUser({muted : false, account : account}, function(ret, err){
+                    		});
+                    	}
+                    	break;
+                    }
+               });
+	}
+</script>
+</html>
